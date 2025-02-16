@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Store Recommendations{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12 mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2 class="mb-0">Store Recommendations</h2>
+                <p class="text-muted mb-0">Based on your grocery list, here are the best store options:</p>
+            </div>
+            <div class="btn-group">
+                <button type="button" class="btn btn-outline-success dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                    Sort By: {{ {'has_all_items': 'Availability', 'price': 'Price', 'distance': 'Distance', 'eta': 'ETA', 'rating': 'Rating'}[current_sort] }}
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item {% if current_sort == 'has_all_items' %}active{% endif %}" href="?sort=has_all_items">Availability</a></li>
+                    <li><a class="dropdown-item {% if current_sort == 'price' %}active{% endif %}" href="?sort=price">Price</a></li>
+                    <li><a class="dropdown-item {% if current_sort == 'distance' %}active{% endif %}" href="?sort=distance">Distance</a></li>
+                    <li><a class="dropdown-item {% if current_sort == 'eta' %}active{% endif %}" href="?sort=eta">ETA</a></li>
+                    <li><a class="dropdown-item {% if current_sort == 'rating' %}active{% endif %}" href="?sort=rating">Rating</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    {% for store in stores %}
+    <div class="col-md-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h3 class="card-title">{{ store.name }}</h3>
+                <div class="store-details mb-3">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Distance:</span>
+                        <span>{{ store.distance }} miles</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>ETA:</span>
+                        <span>{{ store.eta }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Rating:</span>
+                        <span>{{ store.rating }} ⭐</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2 align-items-center">
+                        <span>Has All Items:</span>
+                        {% if store.missing_items|length == 0 %}
+                            <span class="text-success"><i class="fas fa-check-circle"></i></span>
+                        {% else %}
+                            <span>
+                                <i class="fas fa-times-circle text-danger"></i>
+                                <button class="btn btn-link btn-sm text-danger p-0 ms-2" 
+                                        onclick="toggleMissingItems('{{ store.id }}')"
+                                        style="text-decoration: none;">
+                                    Show Missing
+                                </button>
+                            </span>
+                        {% endif %}
+                    </div>
+                    {% if store.missing_items|length > 0 %}
+                        <div id="missing-items-{{ store.id }}" style="display: none;" class="mt-2">
+                            <small class="text-danger">
+                                Missing Items:
+                                <ul class="mb-0 ps-3">
+                                    {% for item in store.missing_items %}
+                                        <li>{{ item }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </small>
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <div class="text-center mb-3">
+                    <h4 class="text-success mb-0">Total Price</h4>
+                    <h3 class="mb-0">${{ "%.2f"|format(store.total_price) }}</h3>
+                </div>
+                
+                <a href="{{ url_for('payment', store_id=store.id) }}" class="btn btn-primary w-100">Select This Store</a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    
+    <script>
+    function toggleMissingItems(storeId) {
+        const missingItemsDiv = document.getElementById(`missing-items-${storeId}`);
+        const isHidden = missingItemsDiv.style.display === 'none';
+        missingItemsDiv.style.display = isHidden ? 'block' : 'none';
+        
+        // Update button text
+        const button = event.target;
+        button.textContent = isHidden ? 'Hide Missing' : 'Show Missing';
+    }
+    </script>
+</div>
+{% endblock %}

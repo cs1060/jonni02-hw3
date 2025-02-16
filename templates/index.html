@@ -1,0 +1,525 @@
+{% extends "base.html" %}
+
+{% block title %}Build Your Grocery List{% endblock %}
+
+{% block content %}
+<div class="welcome-section text-center">
+    <h1>Welcome to SmartShop Optimizer</h1>
+    <p>Create your smart shopping lists and find the best stores for your needs. We'll help you optimize your shopping experience and save both time and money.</p>
+    <button class="btn btn-success btn-lg" data-bs-toggle="modal" data-bs-target="#newListModal">
+        <i class="fas fa-plus-circle me-2"></i>Create New Shopping List
+    </button>
+</div>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h2 class="mb-0">Available Items</h2>
+                        <button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#addItemModal">
+                            <i class="fas fa-plus-circle me-2"></i>Add New Item
+                        </button>
+                    </div>
+                    <div class="mb-3">
+                        <input type="text" class="form-control" id="searchItems" placeholder="Search items...">
+                    </div>
+                    
+                    <div class="items-container">
+                        <div class="row" id="itemsList">
+                            {% for item in items %}
+                            <div class="col-md-4 mb-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5 class="card-title">{{ item.name }}</h5>
+                                        <p class="card-text">{{ item.category }} - {{ item.unit }}</p>
+                                        <div class="d-flex align-items-center">
+                                            <button class="btn btn-sm btn-primary me-2" onclick="decrementQuantity('{{ item.id }}')">-</button>
+                                            <span id="quantity-{{ item.id }}">0</span>
+                                            <button class="btn btn-sm btn-primary ms-2" onclick="incrementQuantity('{{ item.id }}')">+</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div id="shoppingLists">
+                <!-- Shopping lists will be added here dynamically -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Item Modal -->
+<div class="modal fade" id="addItemModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="newItemName" class="form-label">Item Name</label>
+                    <input type="text" class="form-control" id="newItemName" required>
+                </div>
+                <div class="mb-3">
+                    <label for="newItemCategory" class="form-label">Category</label>
+                    <select class="form-select" id="newItemCategory" required>
+                        <option value="">Select a category</option>
+                        <option value="Produce">Produce</option>
+                        <option value="Meat">Meat</option>
+                        <option value="Dairy">Dairy</option>
+                        <option value="Bakery">Bakery</option>
+                        <option value="Pantry">Pantry</option>
+                        <option value="Frozen">Frozen</option>
+                        <option value="Beverages">Beverages</option>
+                        <option value="Household">Household</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="newItemUnit" class="form-label">Unit</label>
+                    <select class="form-select" id="newItemUnit" required>
+                        <option value="">Select a unit</option>
+                        <option value="lbs">lbs</option>
+                        <option value="oz">oz</option>
+                        <option value="count">count</option>
+                        <option value="gallons">gallons</option>
+                        <option value="liters">liters</option>
+                        <option value="boxes">boxes</option>
+                        <option value="bags">bags</option>
+                        <option value="cans">cans</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="addNewItem()">Add Item</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New List Modal -->
+<div class="modal fade" id="newListModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Create New Shopping List</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form onsubmit="createNewList(); return false;">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="newListName" class="form-label">List Name</label>
+                        <input type="text" class="form-control" id="newListName" placeholder="Enter list name" autofocus>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-success">Create List</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let shoppingLists = [];
+let currentListId = null;
+let items = {{ items|tojson|safe }};
+
+function createNewList() {
+    const listName = document.getElementById('newListName').value.trim();
+    if (!listName) {
+        alert('Please enter a list name');
+        return;
+    }
+    
+    // Reset all item quantities in the main list to 0
+    items.forEach(item => {
+        const quantityElement = document.getElementById(`quantity-${item.id}`);
+        if (quantityElement) {
+            quantityElement.textContent = '0';
+        }
+    });
+    
+    const newList = {
+        id: Date.now().toString(),
+        name: listName,
+        items: new Map()
+    };
+    
+    shoppingLists.push(newList);
+    currentListId = newList.id;
+    
+    // Close modal and clear form
+    cleanupModal('newListModal');
+    document.getElementById('newListName').value = '';
+    
+    // Update display
+    updateShoppingListsDisplay();
+}
+
+function cleanupModal(modalId) {
+    const modalElement = document.getElementById(modalId);
+    const modalInstance = bootstrap.Modal.getInstance(modalElement);
+    if (modalInstance) {
+        modalInstance.hide();
+    }
+    
+    // Remove modal backdrop if it exists
+    const backdrop = document.querySelector('.modal-backdrop');
+    if (backdrop) {
+        backdrop.remove();
+    }
+    
+    // Remove modal-open class from body
+    document.body.classList.remove('modal-open');
+    document.body.style.overflow = '';
+    document.body.style.paddingRight = '';
+}
+
+function updateShoppingListsDisplay() {
+    // Store the current state of expanded lists
+    const expandedLists = new Set();
+    document.querySelectorAll('.shopping-list-content').forEach((content) => {
+        if (content.style.display === 'block') {
+            const card = content.closest('.shopping-list-card');
+            if (card) {
+                const listId = card.dataset.listId;
+                if (listId) expandedLists.add(listId);
+            }
+        }
+    });
+    
+    const listsContainer = document.getElementById('shoppingLists');
+    listsContainer.innerHTML = '';
+    
+    shoppingLists.forEach(list => {
+        // Count unique items with quantity > 0
+        const uniqueItemCount = Array.from(list.items.entries())
+            .filter(([_, qty]) => qty > 0)
+            .length;
+        
+        const isActive = list.id === currentListId;
+        const isExpanded = expandedLists.has(list.id);
+        
+        const listElement = document.createElement('div');
+        listElement.className = 'shopping-list-card';
+        listElement.dataset.listId = list.id;
+        listElement.innerHTML = `
+            <button class="shopping-list-header" onclick="toggleList('${list.id}')">
+                <div class="list-header-content">
+                    <div class="list-name-section">
+                        <strong>${list.name}</strong>
+                        <small class="ms-2">(${uniqueItemCount} unique item${uniqueItemCount !== 1 ? 's' : ''})</small>
+                    </div>
+                    ${isActive ? '<span class="current-label">Current</span>' : ''}
+                </div>
+                <i class="fas fa-chevron-down list-toggle-icon ${isExpanded ? 'rotated' : ''}"></i>
+            </button>
+            <div class="shopping-list-content" style="display: ${isExpanded ? 'block' : 'none'}">
+                <div class="shopping-list-items">
+                    ${renderListItems(list)}
+                </div>
+                <div class="list-actions">
+                    ${!isActive ? `
+                        <button class="make-current-btn" onclick="setCurrentList('${list.id}')">
+                            Make Current
+                        </button>
+                    ` : ''}
+                    <div class="list-actions-right">
+                        <button class="btn btn-sm btn-success" onclick="findStores('${list.id}')">
+                            <i class="fas fa-search me-1"></i>Find Stores
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteList('${list.id}')">
+                            <i class="fas fa-trash me-1"></i>Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        listsContainer.appendChild(listElement);
+    });
+}
+
+function toggleList(listId) {
+    const header = document.querySelector(`.shopping-list-header[onclick*="${listId}"]`);
+    const content = header.nextElementSibling;
+    const icon = header.querySelector('.list-toggle-icon');
+    
+    // Toggle this list's visibility
+    content.style.display = content.style.display === 'none' ? 'block' : 'none';
+    icon.classList.toggle('rotated');
+}
+
+function setCurrentList(listId) {
+    currentListId = listId;
+    
+    // Reset all item quantities in the main list to 0
+    items.forEach(item => {
+        const quantityElement = document.getElementById(`quantity-${item.id}`);
+        if (quantityElement) {
+            quantityElement.textContent = '0';
+        }
+    });
+    
+    // Update quantities based on current list
+    const currentList = getCurrentList();
+    if (currentList) {
+        currentList.items.forEach((quantity, itemId) => {
+            const quantityElement = document.getElementById(`quantity-${itemId}`);
+            if (quantityElement) {
+                quantityElement.textContent = quantity;
+            }
+        });
+    }
+    
+    updateShoppingListsDisplay();
+}
+
+function deleteList(listId) {
+    if (confirm('Are you sure you want to delete this list?')) {
+        shoppingLists = shoppingLists.filter(list => list.id !== listId);
+        if (currentListId === listId) {
+            currentListId = shoppingLists.length > 0 ? shoppingLists[0].id : null;
+        }
+        updateShoppingListsDisplay();
+    }
+}
+
+function renderListItems(list) {
+    if (!list.items || list.items.size === 0) {
+        return '<p class="text-muted">No items in this list</p>';
+    }
+    
+    let html = '<div class="list-group list-group-flush">';
+    for (const [itemId, quantity] of list.items) {
+        const item = items.find(i => i.id.toString() === itemId);
+        if (item && quantity > 0) {
+            html += `
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="item-name">${item.name}</span>
+                        <small class="text-muted ms-2">${item.category}</small>
+                    </div>
+                    <span class="badge bg-primary rounded-pill">${quantity} ${item.unit}</span>
+                </div>`;
+        }
+    }
+    html += '</div>';
+    return html;
+}
+
+function incrementQuantity(itemId) {
+    if (!currentListId) {
+        alert('Please create a shopping list first');
+        return;
+    }
+    
+    // Find the current list
+    let list = shoppingLists.find(l => l.id === currentListId);
+    if (!list) {
+        list = {
+            id: currentListId,
+            name: "Shopping List",
+            items: new Map()
+        };
+        shoppingLists.push(list);
+    }
+    
+    // Get current quantity and increment
+    const current = list.items.get(itemId.toString()) || 0;
+    const newQuantity = current + 1;
+    list.items.set(itemId.toString(), newQuantity);
+    
+    // Update displays
+    updateItemQuantityDisplay(itemId, newQuantity);
+}
+
+function decrementQuantity(itemId) {
+    if (!currentListId) return;
+    
+    const list = shoppingLists.find(l => l.id === currentListId);
+    if (!list) return;
+    
+    const current = list.items.get(itemId.toString()) || 0;
+    if (current <= 0) return;
+    
+    const newQuantity = current - 1;
+    if (newQuantity === 0) {
+        list.items.delete(itemId.toString());
+    } else {
+        list.items.set(itemId.toString(), newQuantity);
+    }
+    
+    // Update displays
+    updateItemQuantityDisplay(itemId, newQuantity);
+}
+
+function updateItemQuantityDisplay(itemId, quantity) {
+    // Update quantity in the main items list
+    const quantityElement = document.getElementById(`quantity-${itemId}`);
+    if (quantityElement) {
+        quantityElement.textContent = quantity;
+    }
+    
+    // Update the shopping lists display
+    updateShoppingListsDisplay();
+}
+
+function getCurrentList() {
+    return shoppingLists.find(list => list.id === currentListId);
+}
+
+function addNewItem() {
+    const name = document.getElementById('newItemName').value;
+    const category = document.getElementById('newItemCategory').value;
+    const unit = document.getElementById('newItemUnit').value;
+    
+    if (!name || !category || !unit) {
+        alert('Please fill in all fields');
+        return;
+    }
+    
+    const newItemId = Date.now().toString();
+    const newItem = {
+        id: newItemId,
+        name: name,
+        category: category,
+        unit: unit
+    };
+    
+    items.push(newItem);
+    
+    // Add the new item to the items list
+    const itemsList = document.getElementById('itemsList');
+    const itemElement = document.createElement('div');
+    itemElement.className = 'col-md-4 mb-3';
+    itemElement.innerHTML = `
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">${newItem.name}</h5>
+                <p class="card-text">${newItem.category} - ${newItem.unit}</p>
+                <div class="d-flex align-items-center">
+                    <button class="btn btn-sm btn-primary me-2" onclick="decrementQuantity('${newItemId}')">-</button>
+                    <span id="quantity-${newItemId}">0</span>
+                    <button class="btn btn-sm btn-primary ms-2" onclick="incrementQuantity('${newItemId}')">+</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    itemsList.appendChild(itemElement);
+    
+    // Close modal and clear form
+    cleanupModal('addItemModal');
+    document.getElementById('newItemName').value = '';
+    document.getElementById('newItemCategory').value = '';
+    document.getElementById('newItemUnit').value = '';
+}
+
+function findStores(listId) {
+    const list = shoppingLists.find(l => l.id === listId);
+    if (!list || list.items.size === 0) {
+        alert('Please add items to your list first');
+        return;
+    }
+    
+    window.location.href = '/stores';
+}
+
+// Add event listeners for modal cleanup and focus
+document.getElementById('addItemModal').addEventListener('shown.bs.modal', function () {
+    document.getElementById('newItemName').focus();
+});
+
+document.getElementById('addItemModal').addEventListener('hidden.bs.modal', function () {
+    cleanupModal('addItemModal');
+});
+
+document.getElementById('newListModal').addEventListener('shown.bs.modal', function () {
+    document.getElementById('newListName').focus();
+});
+
+document.getElementById('newListModal').addEventListener('hidden.bs.modal', function () {
+    cleanupModal('newListModal');
+});
+
+// Add keyboard event listeners for Enter key
+document.getElementById('newListName').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        createNewList();
+    }
+});
+
+const addItemInputs = ['newItemName', 'newItemCategory', 'newItemUnit'];
+addItemInputs.forEach(inputId => {
+    document.getElementById(inputId).addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const name = document.getElementById('newItemName').value.trim();
+            const category = document.getElementById('newItemCategory').value;
+            const unit = document.getElementById('newItemUnit').value;
+            
+            if (name && category && unit) {
+                addNewItem();
+            } else {
+                // Move focus to the next empty required field
+                if (!name) {
+                    document.getElementById('newItemName').focus();
+                } else if (!category) {
+                    document.getElementById('newItemCategory').focus();
+                } else if (!unit) {
+                    document.getElementById('newItemUnit').focus();
+                }
+            }
+        }
+    });
+});
+
+// Search functionality
+document.getElementById('searchItems').addEventListener('input', function(e) {
+    const searchTerm = e.target.value.toLowerCase();
+    const filteredItems = items.filter(item => 
+        item.name.toLowerCase().includes(searchTerm) || 
+        item.category.toLowerCase().includes(searchTerm)
+    );
+    
+    const itemsList = document.getElementById('itemsList');
+    itemsList.innerHTML = filteredItems.map(item => `
+        <div class="col-md-4 mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">${item.name}</h5>
+                    <p class="card-text">${item.category} - ${item.unit}</p>
+                    <div class="d-flex align-items-center">
+                        <button class="btn btn-sm btn-primary me-2" onclick="decrementQuantity('${item.id}')">-</button>
+                        <span id="quantity-${item.id}">${getCurrentList()?.items.get(item.id.toString()) || 0}</span>
+                        <button class="btn btn-sm btn-primary ms-2" onclick="incrementQuantity('${item.id}')">+</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+});
+
+document.querySelector('.welcome-section .btn').addEventListener('click', function() {
+    const modal = new bootstrap.Modal(document.getElementById('newListModal'));
+    modal.show();
+    // Focus will be handled by the shown.bs.modal event
+});
+</script>
+{% endblock %}
